@@ -18,9 +18,9 @@
 int main() {
     std::cout << "--- NumIter Library Demonstration ---" << std::endl;
 
-    // --- 1. Basic range iterator ---
-    std::cout << "\n[1] Basic range_iterator(0, 5, 1):" << std::endl;
-    auto r = numiter::range(0, 5, 1);
+    // --- 1. Basic iota iterator ---
+    std::cout << "\n[1] Basic iota(0, 5):" << std::endl;
+    auto r = numiter::iota(0, 5);
     for (size_t i = 0; i < r.size(); ++i) {
         std::cout << "  r[" << i << "] = " << r[i] << std::endl;
     }
@@ -38,7 +38,7 @@ int main() {
     // --- 3. Lazy Expression Templates ---
     // The expression `2.0 * sin(r)` is not computed immediately.
     // It creates an expression object that is evaluated on-demand.
-    std::cout << "\n[3] Lazy Expression: 2.0 * sin(range(0, 5, 1))" << std::endl;
+    std::cout << "\n[3] Lazy Expression: 2.0 * sin(iota(0, 5))" << std::endl;
     auto lazy_expr = 2.0 * numiter::sin(r);
     for (size_t i = 0; i < lazy_expr.size(); ++i) {
         std::cout << "  lazy_expr[" << i << "] = " << lazy_expr[i] << std::endl;
@@ -46,26 +46,25 @@ int main() {
 
     // --- 4. O(1) Algebraic Simplification ---
     // The expression `2.0 * (3.0 * r)` is simplified at compile time
-    // to `6.0 * r`, which is then further simplified to a single range_iterator.
-    std::cout << "\n[4] O(1) Algebraic Simplification: 2.0 * (3.0 * range(0, 5, 1))" << std::endl;
+    // to `6.0 * r`.
+    std::cout << "\n[4] O(1) Algebraic Simplification: 2.0 * (3.0 * iota(0, 5))" << std::endl;
     auto simplified_expr = 2.0 * (3.0 * r);
-    std::cout << "  (Should be equivalent to range(0, 30, 6))" << std::endl;
     for (size_t i = 0; i < simplified_expr.size(); ++i) {
         std::cout << "  simplified_expr[" << i << "] = " << simplified_expr[i] << std::endl;
     }
 
     // --- 5. 3D Coordinate Mapping ---
     // Treat a flat iterator as a 3D view.
-    std::cout << "\n[5] 3D View (2x3x4) over range(0, 24, 1):" << std::endl;
-    auto r_3d = numiter::range(0, 2 * 3 * 4, 1);
+    std::cout << "\n[5] 3D View (2x3x4) over iota(0, 24):" << std::endl;
+    auto r_3d = numiter::iota(0, 2 * 3 * 4);
     numiter::View3D view(r_3d, 2, 3, 4);
     std::cout << "  view.get(1, 1, 1) = " << view.get(1, 1, 1) << std::endl;
     std::cout << "  Expected flat index: " << (1 * 3 * 4 + 1 * 4 + 1) << std::endl;
 
     // --- 6. Test Subtraction ---
-    std::cout << "\n[6] Subtraction: range(10, 15, 1) - range(0, 5, 1)" << std::endl;
-    auto r1 = numiter::range(10, 15, 1);
-    auto r2 = numiter::range(0, 5, 1);
+    std::cout << "\n[6] Subtraction: iota(10, 15) - iota(0, 5)" << std::endl;
+    auto r1 = numiter::iota(10, 15);
+    auto r2 = numiter::iota(0, 5);
     auto sub_expr = r1 - r2;
     for (size_t i = 0; i < sub_expr.size(); ++i) {
         std::cout << "  sub_expr[" << i << "] = " << sub_expr[i] << std::endl;
@@ -90,6 +89,17 @@ int main() {
     double manual_mean = manual_sum / 3.0;
     std::cout << "  Manual verification: " << manual_mean << std::endl;
 
+    // --- 8. Test Size Mismatch Exception ---
+    std::cout << "\n[8] Testing exception for mismatched sizes:" << std::endl;
+    try {
+        auto r_long = numiter::iota(0, 10);
+        auto r_short = numiter::iota(0, 5);
+        auto bad_expr = r_long + r_short;
+        // This line should not be reached
+        std::cout << "  Error: Exception was not thrown!" << std::endl;
+    } catch (const std::runtime_error& e) {
+        std::cout << "  Successfully caught expected exception: " << e.what() << std::endl;
+    }
 
     std::cout << "\n--- Demonstration Complete ---" << std::endl;
     return 0;
