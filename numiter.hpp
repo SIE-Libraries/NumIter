@@ -194,6 +194,24 @@ template <typename Iter>
 auto exp(const numiterator<Iter>& iter) {
     return UnaryExpr([](auto x) { return std::exp(x); }, iter.derived());
 }
+template <typename Iter>
+auto sqrt(const numiterator<Iter>& iter) {
+    return UnaryExpr([](auto x) { return std::sqrt(x); }, iter.derived());
+}
+template <typename Iter>
+auto abs(const numiterator<Iter>& iter) {
+    return UnaryExpr([](auto x) { return std::abs(x); }, iter.derived());
+}
+
+template <typename Lhs, typename Rhs>
+auto pow(const numiterator<Lhs>& lhs, const numiterator<Rhs>& rhs) {
+    return BinaryExpr([](auto x, auto y) { return std::pow(x, y); }, lhs.derived(), rhs.derived());
+}
+
+template <typename Lhs, typename T>
+auto pow(const numiterator<Lhs>& lhs, T exponent) {
+    return BinaryExpr([](auto x, auto y) { return std::pow(x, y); }, lhs.derived(), Scalar<T>(exponent));
+}
 
 
 // --- 3D View ---
@@ -232,6 +250,38 @@ auto sum(const numiterator<Iter>& iter) {
 template <typename Iter>
 auto mean(const numiterator<Iter>& iter) {
     return sum(iter) / static_cast<double>(iter.size());
+}
+
+template <typename Iter>
+auto product(const numiterator<Iter>& iter) {
+    using T = decltype(iter.derived()[0]);
+    T prod = 1;
+    for (size_t i = 0; i < iter.size(); ++i) {
+        prod *= iter.derived()[i];
+    }
+    return prod;
+}
+
+template <typename Iter>
+auto min(const numiterator<Iter>& iter) {
+    if (iter.size() == 0) throw std::runtime_error("min of empty iterator");
+    auto m = iter.derived()[0];
+    for (size_t i = 1; i < iter.size(); ++i) {
+        auto val = iter.derived()[i];
+        if (val < m) m = val;
+    }
+    return m;
+}
+
+template <typename Iter>
+auto max(const numiterator<Iter>& iter) {
+    if (iter.size() == 0) throw std::runtime_error("max of empty iterator");
+    auto m = iter.derived()[0];
+    for (size_t i = 1; i < iter.size(); ++i) {
+        auto val = iter.derived()[i];
+        if (val > m) m = val;
+    }
+    return m;
 }
 
 

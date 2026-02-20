@@ -110,6 +110,36 @@ int main() {
     }
     std::cout << std::endl;
 
+    // --- 9. More UFuncs and Reductions ---
+    std::cout << "\n[9] More UFuncs and Reductions:" << std::endl;
+    auto r_mixed = numiter::range(-2.0, 3.0, 1.0); // -2, -1, 0, 1, 2
+    auto abs_r = numiter::abs(r_mixed);
+    std::cout << "  abs(range(-2, 3)): ";
+    for (size_t i = 0; i < abs_r.size(); ++i) {
+        std::cout << abs_r[i] << (i == abs_r.size() - 1 ? "" : ", ");
+    }
+    std::cout << std::endl;
+
+    auto r_pos = numiter::range(1.0, 5.0, 1.0); // 1, 2, 3, 4
+    std::cout << "  sqrt(range(1, 5)): ";
+    auto sqrt_r = numiter::sqrt(r_pos);
+    for (size_t i = 0; i < sqrt_r.size(); ++i) {
+        std::cout << sqrt_r[i] << (i == sqrt_r.size() - 1 ? "" : ", ");
+    }
+    std::cout << std::endl;
+
+    std::cout << "  pow(range(1, 5), 2.0): ";
+    auto pow_r = numiter::pow(r_pos, 2.0);
+    for (size_t i = 0; i < pow_r.size(); ++i) {
+        std::cout << pow_r[i] << (i == pow_r.size() - 1 ? "" : ", ");
+    }
+    std::cout << std::endl;
+
+    std::cout << "  Reductions on range(1, 5):" << std::endl;
+    std::cout << "    product: " << numiter::product(r_pos) << " (Expected 24)" << std::endl;
+    std::cout << "    min: " << numiter::min(r_pos) << " (Expected 1)" << std::endl;
+    std::cout << "    max: " << numiter::max(r_pos) << " (Expected 4)" << std::endl;
+
 
     std::cout << "\n--- Demonstration Complete ---" << std::endl;
     return 0;
