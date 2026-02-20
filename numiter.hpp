@@ -23,27 +23,45 @@ auto operator*(const T1& c1, const BinaryExpr<Mul, Scalar<T2>, Iter>& rhs);
 
 
 // --- Operator Definitions ---
-#define DEFINE_BINARY_OP(name, op) \
-struct name { \
-    template <typename T1, typename T2> \
-    static auto apply(T1 lhs, T2 rhs) { return lhs op rhs; } \
+struct Add {
+    template <typename T1, typename T2>
+    auto operator()(T1 lhs, T2 rhs) const { return lhs + rhs; }
 };
 
-DEFINE_BINARY_OP(Add, +)
-DEFINE_BINARY_OP(Sub, -)
-DEFINE_BINARY_OP(Mul, *)
-
-#define DEFINE_UNARY_OP(name, func) \
-struct name { \
-    template <typename T> \
-    static auto apply(T val) { return std::func(val); } \
+struct Sub {
+    template <typename T1, typename T2>
+    auto operator()(T1 lhs, T2 rhs) const { return lhs - rhs; }
 };
 
-DEFINE_UNARY_OP(Sin, sin)
-DEFINE_UNARY_OP(Cos, cos)
-DEFINE_UNARY_OP(Tan, tan)
-DEFINE_UNARY_OP(Log, log)
-DEFINE_UNARY_OP(Exp, exp)
+struct Mul {
+    template <typename T1, typename T2>
+    auto operator()(T1 lhs, T2 rhs) const { return lhs * rhs; }
+};
+
+struct Sin {
+    template <typename T>
+    auto operator()(T val) const { return std::sin(val); }
+};
+
+struct Cos {
+    template <typename T>
+    auto operator()(T val) const { return std::cos(val); }
+};
+
+struct Tan {
+    template <typename T>
+    auto operator()(T val) const { return std::tan(val); }
+};
+
+struct Log {
+    template <typename T>
+    auto operator()(T val) const { return std::log(val); }
+};
+
+struct Exp {
+    template <typename T>
+    auto operator()(T val) const { return std::exp(val); }
+};
 
 
 // --- Core numiterator Interface ---
@@ -79,6 +97,27 @@ private:
 template <typename T>
 auto iota(T start, T stop) {
     return RangeAdapter(std::views::iota(start, stop));
+}
+
+// Python-like range function with stride
+template <typename T>
+auto range(T start, T stop, T stride = 1) {
+    if (stride == 0) throw std::invalid_argument("stride must not be zero");
+
+    size_t count = 0;
+    if ((stride > 0 && stop > start) || (stride < 0 && stop < start)) {
+        // Use double for count calculation to handle both integer and floating point types.
+        // We subtract a tiny epsilon to handle floating point precision issues
+        // when (stop - start) is exactly a multiple of stride.
+        double d_count = std::ceil((static_cast<double>(stop) - static_cast<double>(start)) / static_cast<double>(stride) - 1e-10);
+        if (d_count > 0) {
+            count = static_cast<size_t>(d_count);
+        }
+    }
+
+    return RangeAdapter(std::views::iota(size_t(0), count) | std::views::transform([start, stride](size_t i) {
+        return static_cast<T>(static_cast<double>(start) + static_cast<double>(i) * static_cast<double>(stride));
+    }));
 }
 
 template <typename T>
@@ -118,27 +157,29 @@ private:
 template <typename Op, typename Iter>
 class UnaryExpr : public numiterator<UnaryExpr<Op, Iter>> {
 public:
-    UnaryExpr(const Iter& iter) : m_iter(iter) {}
-    auto get(size_t index) const { return Op::apply(m_iter[index]); }
+    UnaryExpr(Op op, const Iter& iter) : m_op(op), m_iter(iter) {}
+    auto get(size_t index) const { return m_op(m_iter[index]); }
     size_t size() const { return m_iter.size(); }
 private:
+    Op m_op;
     Iter m_iter;
 };
 
 template <typename Op, typename Lhs, typename Rhs>
 class BinaryExpr : public numiterator<BinaryExpr<Op, Lhs, Rhs>> {
 public:
-    BinaryExpr(const Lhs& lhs, const Rhs& rhs) : m_lhs(lhs), m_rhs(rhs) {
+    BinaryExpr(Op op, const Lhs& lhs, const Rhs& rhs) : m_op(op), m_lhs(lhs), m_rhs(rhs) {
         if (lhs.size() != 0 && rhs.size() != 0 && lhs.size() != rhs.size()) {
             throw std::runtime_error("Incompatible sizes in BinaryExpr");
         }
     }
-    auto get(size_t index) const { return Op::apply(m_lhs[index], m_rhs[index]); }
+    auto get(size_t index) const { return m_op(m_lhs[index], m_rhs[index]); }
     size_t size() const {
         if (m_lhs.size() != 0) return m_lhs.size();
         return m_rhs.size();
     }
 private:
+    Op m_op;
     Lhs m_lhs;
     Rhs m_rhs;
     template <typename T1, typename T2, typename Iter>
@@ -148,23 +189,23 @@ private:
 
 // --- Operator Overloads ---
 template <typename Lhs, typename Rhs>
-BinaryExpr<Add, Lhs, Rhs> operator+(const numiterator<Lhs>& lhs, const numiterator<Rhs>& rhs) {
-    return BinaryExpr<Add, Lhs, Rhs>(lhs.derived(), rhs.derived());
+auto operator+(const numiterator<Lhs>& lhs, const numiterator<Rhs>& rhs) {
+    return BinaryExpr(Add{}, lhs.derived(), rhs.derived());
 }
 template <typename Lhs, typename Rhs>
-BinaryExpr<Sub, Lhs, Rhs> operator-(const numiterator<Lhs>& lhs, const numiterator<Rhs>& rhs) {
-    return BinaryExpr<Sub, Lhs, Rhs>(lhs.derived(), rhs.derived());
+auto operator-(const numiterator<Lhs>& lhs, const numiterator<Rhs>& rhs) {
+    return BinaryExpr(Sub{}, lhs.derived(), rhs.derived());
 }
 template <typename Lhs, typename Rhs>
-BinaryExpr<Mul, Lhs, Rhs> operator*(const numiterator<Lhs>& lhs, const numiterator<Rhs>& rhs) {
-    return BinaryExpr<Mul, Lhs, Rhs>(lhs.derived(), rhs.derived());
+auto operator*(const numiterator<Lhs>& lhs, const numiterator<Rhs>& rhs) {
+    return BinaryExpr(Mul{}, lhs.derived(), rhs.derived());
 }
 template <typename ScalarType, typename Rhs>
-BinaryExpr<Mul, Scalar<ScalarType>, Rhs> operator*(const ScalarType& lhs, const numiterator<Rhs>& rhs) {
-    return BinaryExpr<Mul, Scalar<ScalarType>, Rhs>(Scalar<ScalarType>(lhs), rhs.derived());
+auto operator*(const ScalarType& lhs, const numiterator<Rhs>& rhs) {
+    return BinaryExpr(Mul{}, Scalar<ScalarType>(lhs), rhs.derived());
 }
 template <typename Lhs, typename ScalarType>
-BinaryExpr<Mul, Lhs, Scalar<ScalarType>> operator*(const numiterator<Lhs>& lhs, const ScalarType& rhs) {
+auto operator*(const numiterator<Lhs>& lhs, const ScalarType& rhs) {
     return rhs * lhs.derived();
 }
 
@@ -180,24 +221,24 @@ auto operator*(const T1& c1, const BinaryExpr<Mul, Scalar<T2>, Iter>& rhs) {
 
 // --- UFuncs ---
 template <typename Iter>
-UnaryExpr<Sin, Iter> sin(const numiterator<Iter>& iter) {
-    return UnaryExpr<Sin, Iter>(iter.derived());
+auto sin(const numiterator<Iter>& iter) {
+    return UnaryExpr(Sin{}, iter.derived());
 }
 template <typename Iter>
-UnaryExpr<Cos, Iter> cos(const numiterator<Iter>& iter) {
-    return UnaryExpr<Cos, Iter>(iter.derived());
+auto cos(const numiterator<Iter>& iter) {
+    return UnaryExpr(Cos{}, iter.derived());
 }
 template <typename Iter>
-UnaryExpr<Tan, Iter> tan(const numiterator<Iter>& iter) {
-    return UnaryExpr<Tan, Iter>(iter.derived());
+auto tan(const numiterator<Iter>& iter) {
+    return UnaryExpr(Tan{}, iter.derived());
 }
 template <typename Iter>
-UnaryExpr<Log, Iter> log(const numiterator<Iter>& iter) {
-    return UnaryExpr<Log, Iter>(iter.derived());
+auto log(const numiterator<Iter>& iter) {
+    return UnaryExpr(Log{}, iter.derived());
 }
 template <typename Iter>
-UnaryExpr<Exp, Iter> exp(const numiterator<Iter>& iter) {
-    return UnaryExpr<Exp, Iter>(iter.derived());
+auto exp(const numiterator<Iter>& iter) {
+    return UnaryExpr(Exp{}, iter.derived());
 }
 
 
@@ -237,6 +278,25 @@ auto sum(const numiterator<Iter>& iter) {
 template <typename Iter>
 auto mean(const numiterator<Iter>& iter) {
     return sum(iter) / static_cast<double>(iter.size());
+}
+
+
+// --- Generic Mapping and Zipping ---
+
+/**
+ * @brief Applies a unary function to each element of the iterator lazily.
+ */
+template <typename Iter, typename F>
+auto map(const numiterator<Iter>& iter, F f) {
+    return UnaryExpr(f, iter.derived());
+}
+
+/**
+ * @brief Applies a binary function to elements of two iterators lazily.
+ */
+template <typename Lhs, typename Rhs, typename F>
+auto zip(const numiterator<Lhs>& lhs, const numiterator<Rhs>& rhs, F f) {
+    return BinaryExpr(f, lhs.derived(), rhs.derived());
 }
 
 } // namespace numiter

@@ -90,6 +90,26 @@ int main() {
     double manual_mean = manual_sum / 3.0;
     std::cout << "  Manual verification: " << manual_mean << std::endl;
 
+    // --- 8. New Features: map and zip ---
+    std::cout << "\n[8] New Features: map and zip" << std::endl;
+    auto r_base = numiter::range(1.0, 6.0, 1.0); // 1, 2, 3, 4, 5
+
+    // Test map: square each element
+    auto mapped = numiter::map(r_base, [](auto x) { return x * x; });
+    std::cout << "  map(range(1, 6), x -> x*x): ";
+    for (size_t i = 0; i < mapped.size(); ++i) {
+        std::cout << mapped[i] << (i == mapped.size() - 1 ? "" : ", ");
+    }
+    std::cout << std::endl;
+
+    // Test zip: add two ranges
+    auto zipped = numiter::zip(r_base, mapped, [](auto a, auto b) { return a + b; });
+    std::cout << "  zip(r, r*r, a+b): ";
+    for (size_t i = 0; i < zipped.size(); ++i) {
+        std::cout << zipped[i] << (i == zipped.size() - 1 ? "" : ", ");
+    }
+    std::cout << std::endl;
+
 
     std::cout << "\n--- Demonstration Complete ---" << std::endl;
     return 0;
