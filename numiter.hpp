@@ -10,8 +10,6 @@
 namespace numiter {
 
 // --- Forward Declarations ---
-struct Mul;
-
 template <typename T>
 class Scalar;
 
@@ -19,49 +17,7 @@ template <typename Op, typename Lhs, typename Rhs>
 class BinaryExpr;
 
 template <typename T1, typename T2, typename Iter>
-auto operator*(const T1& c1, const BinaryExpr<Mul, Scalar<T2>, Iter>& rhs);
-
-
-// --- Operator Definitions ---
-struct Add {
-    template <typename T1, typename T2>
-    auto operator()(T1 lhs, T2 rhs) const { return lhs + rhs; }
-};
-
-struct Sub {
-    template <typename T1, typename T2>
-    auto operator()(T1 lhs, T2 rhs) const { return lhs - rhs; }
-};
-
-struct Mul {
-    template <typename T1, typename T2>
-    auto operator()(T1 lhs, T2 rhs) const { return lhs * rhs; }
-};
-
-struct Sin {
-    template <typename T>
-    auto operator()(T val) const { return std::sin(val); }
-};
-
-struct Cos {
-    template <typename T>
-    auto operator()(T val) const { return std::cos(val); }
-};
-
-struct Tan {
-    template <typename T>
-    auto operator()(T val) const { return std::tan(val); }
-};
-
-struct Log {
-    template <typename T>
-    auto operator()(T val) const { return std::log(val); }
-};
-
-struct Exp {
-    template <typename T>
-    auto operator()(T val) const { return std::exp(val); }
-};
+auto operator*(const T1& c1, const BinaryExpr<std::multiplies<>, Scalar<T2>, Iter>& rhs);
 
 
 // --- Core numiterator Interface ---
@@ -107,8 +63,6 @@ auto range(T start, T stop, T stride = 1) {
     size_t count = 0;
     if ((stride > 0 && stop > start) || (stride < 0 && stop < start)) {
         // Use double for count calculation to handle both integer and floating point types.
-        // We subtract a tiny epsilon to handle floating point precision issues
-        // when (stop - start) is exactly a multiple of stride.
         double d_count = std::ceil((static_cast<double>(stop) - static_cast<double>(start)) / static_cast<double>(stride) - 1e-10);
         if (d_count > 0) {
             count = static_cast<size_t>(d_count);
@@ -151,7 +105,7 @@ public:
 private:
     T m_value;
     template <typename T1, typename T2, typename Iter>
-    friend auto operator*(const T1& c1, const BinaryExpr<Mul, Scalar<T2>, Iter>& rhs);
+    friend auto operator*(const T1& c1, const BinaryExpr<std::multiplies<>, Scalar<T2>, Iter>& rhs);
 };
 
 template <typename Op, typename Iter>
@@ -183,26 +137,26 @@ private:
     Lhs m_lhs;
     Rhs m_rhs;
     template <typename T1, typename T2, typename Iter>
-    friend auto operator*(const T1& c1, const BinaryExpr<Mul, Scalar<T2>, Iter>& rhs);
+    friend auto operator*(const T1& c1, const BinaryExpr<std::multiplies<>, Scalar<T2>, Iter>& rhs);
 };
 
 
 // --- Operator Overloads ---
 template <typename Lhs, typename Rhs>
 auto operator+(const numiterator<Lhs>& lhs, const numiterator<Rhs>& rhs) {
-    return BinaryExpr(Add{}, lhs.derived(), rhs.derived());
+    return BinaryExpr(std::plus<>{}, lhs.derived(), rhs.derived());
 }
 template <typename Lhs, typename Rhs>
 auto operator-(const numiterator<Lhs>& lhs, const numiterator<Rhs>& rhs) {
-    return BinaryExpr(Sub{}, lhs.derived(), rhs.derived());
+    return BinaryExpr(std::minus<>{}, lhs.derived(), rhs.derived());
 }
 template <typename Lhs, typename Rhs>
 auto operator*(const numiterator<Lhs>& lhs, const numiterator<Rhs>& rhs) {
-    return BinaryExpr(Mul{}, lhs.derived(), rhs.derived());
+    return BinaryExpr(std::multiplies<>{}, lhs.derived(), rhs.derived());
 }
 template <typename ScalarType, typename Rhs>
 auto operator*(const ScalarType& lhs, const numiterator<Rhs>& rhs) {
-    return BinaryExpr(Mul{}, Scalar<ScalarType>(lhs), rhs.derived());
+    return BinaryExpr(std::multiplies<>{}, Scalar<ScalarType>(lhs), rhs.derived());
 }
 template <typename Lhs, typename ScalarType>
 auto operator*(const numiterator<Lhs>& lhs, const ScalarType& rhs) {
@@ -212,7 +166,7 @@ auto operator*(const numiterator<Lhs>& lhs, const ScalarType& rhs) {
 
 // --- Algebraic Simplifications ---
 template <typename T1, typename T2, typename Iter>
-auto operator*(const T1& c1, const BinaryExpr<Mul, Scalar<T2>, Iter>& rhs) {
+auto operator*(const T1& c1, const BinaryExpr<std::multiplies<>, Scalar<T2>, Iter>& rhs) {
     const Iter& iter = rhs.m_rhs;
     const T2& c2 = rhs.m_lhs.m_value;
     return (c1 * c2) * iter;
@@ -222,23 +176,23 @@ auto operator*(const T1& c1, const BinaryExpr<Mul, Scalar<T2>, Iter>& rhs) {
 // --- UFuncs ---
 template <typename Iter>
 auto sin(const numiterator<Iter>& iter) {
-    return UnaryExpr(Sin{}, iter.derived());
+    return UnaryExpr([](auto x) { return std::sin(x); }, iter.derived());
 }
 template <typename Iter>
 auto cos(const numiterator<Iter>& iter) {
-    return UnaryExpr(Cos{}, iter.derived());
+    return UnaryExpr([](auto x) { return std::cos(x); }, iter.derived());
 }
 template <typename Iter>
 auto tan(const numiterator<Iter>& iter) {
-    return UnaryExpr(Tan{}, iter.derived());
+    return UnaryExpr([](auto x) { return std::tan(x); }, iter.derived());
 }
 template <typename Iter>
 auto log(const numiterator<Iter>& iter) {
-    return UnaryExpr(Log{}, iter.derived());
+    return UnaryExpr([](auto x) { return std::log(x); }, iter.derived());
 }
 template <typename Iter>
 auto exp(const numiterator<Iter>& iter) {
-    return UnaryExpr(Exp{}, iter.derived());
+    return UnaryExpr([](auto x) { return std::exp(x); }, iter.derived());
 }
 
 
