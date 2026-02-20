@@ -140,6 +140,25 @@ int main() {
     std::cout << "    min: " << numiter::min(r_pos) << " (Expected 1)" << std::endl;
     std::cout << "    max: " << numiter::max(r_pos) << " (Expected 4)" << std::endl;
 
+    // --- 10. Quadratic Elevation and O(1) Sum ---
+    std::cout << "\n[10] Quadratic Elevation and O(1) Sum:" << std::endl;
+    auto r1_ap = numiter::range(1.0, 5.0, 1.0); // 1, 2, 3, 4
+    auto r2_ap = numiter::range(1.0, 5.0, 1.0); // 1, 2, 3, 4
+
+    // AP * AP should elevate to Quadratic: (i+1)*(i+1) = i^2 + 2i + 1
+    auto q_elevated = r1_ap * r2_ap;
+    std::cout << "  (range(1, 5) * range(1, 5)): ";
+    for (size_t i = 0; i < q_elevated.size(); ++i) {
+        std::cout << q_elevated[i] << (i == q_elevated.size() - 1 ? "" : ", ");
+    }
+    std::cout << std::endl;
+
+    double q_sum = numiter::sum(q_elevated);
+    std::cout << "  O(1) sum: " << q_sum << " (Expected: 1+4+9+16 = 30)" << std::endl;
+
+    auto q_sum_plus = q_elevated + q_elevated;
+    std::cout << "  (q + q) sum: " << numiter::sum(q_sum_plus) << " (Expected: 60)" << std::endl;
+
 
     std::cout << "\n--- Demonstration Complete ---" << std::endl;
     return 0;

@@ -7,11 +7,40 @@
 #include <ranges>
 #include <stdexcept>
 
+#undef HWY_TARGET_INCLUDE
+#define HWY_TARGET_INCLUDE "numiter.hpp"
+#include "hwy/foreach_target.h"
+#include "hwy/highway.h"
+
 namespace numiter {
 
 // --- Forward Declarations ---
 template <typename T>
 class Scalar;
+
+template <typename T>
+class Quadratic;
+
+template <typename T>
+class ArithmeticProgression;
+
+template <typename T>
+struct is_quadratic : std::false_type {};
+
+template <typename T>
+struct is_quadratic<Quadratic<T>> : std::true_type {};
+
+template <typename T>
+struct is_ap : std::false_type {};
+
+template <typename T>
+struct is_ap<ArithmeticProgression<T>> : std::true_type {};
+
+template <typename T>
+inline constexpr bool is_quadratic_v = is_quadratic<T>::value || is_ap<T>::value;
+
+template <typename T>
+inline constexpr bool is_ap_v = is_ap<T>::value;
 
 template <typename Op, typename Lhs, typename Rhs>
 class BinaryExpr;
@@ -49,10 +78,65 @@ private:
     R m_range;
 };
 
+// --- Arithmetic Progression Generator ---
+template <typename T>
+class ArithmeticProgression : public numiterator<ArithmeticProgression<T>> {
+public:
+    using value_type = T;
+    ArithmeticProgression(T start, T stride, size_t size)
+        : m_start(start), m_stride(stride), m_size(size) {}
+
+    T get(size_t i) const { return static_cast<T>(m_start + i * m_stride); }
+    size_t size() const { return m_size; }
+
+    T a() const { return 0; }
+    T b() const { return m_stride; }
+    T c() const { return m_start; }
+
+private:
+    T m_start, m_stride;
+    size_t m_size;
+};
+
+// --- Quadratic Progression Generator ---
+template <typename T>
+class Quadratic : public numiterator<Quadratic<T>> {
+public:
+    using value_type = T;
+    Quadratic(T a, T b, T c, size_t size)
+        : m_a(a), m_b(b), m_c(c), m_size(size) {}
+
+    T get(size_t i) const {
+        return static_cast<T>(m_a * i * i + m_b * i + m_c);
+    }
+
+    size_t size() const { return m_size; }
+
+    T a() const { return m_a; }
+    T b() const { return m_b; }
+    T c() const { return m_c; }
+
+private:
+    T m_a, m_b, m_c;
+    size_t m_size;
+};
+
+// Convenience functions
+template <typename T>
+auto quadratic(T a, T b, T c, size_t size) {
+    return Quadratic<T>(a, b, c, size);
+}
+
+template <typename T>
+auto ap(T start, T stride, size_t size) {
+    return ArithmeticProgression<T>(start, stride, size);
+}
+
 // Convenience function for iota
 template <typename T>
 auto iota(T start, T stop) {
-    return RangeAdapter(std::views::iota(start, stop));
+    size_t count = (stop > start) ? static_cast<size_t>(stop - start) : 0;
+    return ap(start, static_cast<T>(1), count);
 }
 
 // Python-like range function with stride
@@ -62,16 +146,13 @@ auto range(T start, T stop, T stride = 1) {
 
     size_t count = 0;
     if ((stride > 0 && stop > start) || (stride < 0 && stop < start)) {
-        // Use double for count calculation to handle both integer and floating point types.
         double d_count = std::ceil((static_cast<double>(stop) - static_cast<double>(start)) / static_cast<double>(stride) - 1e-10);
         if (d_count > 0) {
             count = static_cast<size_t>(d_count);
         }
     }
 
-    return RangeAdapter(std::views::iota(size_t(0), count) | std::views::transform([start, stride](size_t i) {
-        return static_cast<T>(static_cast<double>(start) + static_cast<double>(i) * static_cast<double>(stride));
-    }));
+    return ap(start, stride, count);
 }
 
 template <typename T>
@@ -144,21 +225,65 @@ private:
 // --- Operator Overloads ---
 template <typename Lhs, typename Rhs>
 auto operator+(const numiterator<Lhs>& lhs, const numiterator<Rhs>& rhs) {
-    return BinaryExpr(std::plus<>{}, lhs.derived(), rhs.derived());
+    if constexpr (is_quadratic_v<Lhs> && is_quadratic_v<Rhs>) {
+        auto& q1 = lhs.derived();
+        auto& q2 = rhs.derived();
+        if (q1.size() != 0 && q2.size() != 0 && q1.size() != q2.size()) {
+             throw std::runtime_error("Incompatible sizes in BinaryExpr (Quadratic + Quadratic)");
+        }
+        size_t new_size = q1.size() != 0 ? q1.size() : q2.size();
+        return quadratic(q1.a() + q2.a(), q1.b() + q2.b(), q1.c() + q2.c(), new_size);
+    } else {
+        return BinaryExpr(std::plus<>{}, lhs.derived(), rhs.derived());
+    }
 }
 template <typename Lhs, typename Rhs>
 auto operator-(const numiterator<Lhs>& lhs, const numiterator<Rhs>& rhs) {
-    return BinaryExpr(std::minus<>{}, lhs.derived(), rhs.derived());
+    if constexpr (is_quadratic_v<Lhs> && is_quadratic_v<Rhs>) {
+        auto& q1 = lhs.derived();
+        auto& q2 = rhs.derived();
+        if (q1.size() != 0 && q2.size() != 0 && q1.size() != q2.size()) {
+             throw std::runtime_error("Incompatible sizes in BinaryExpr (Quadratic - Quadratic)");
+        }
+        size_t new_size = q1.size() != 0 ? q1.size() : q2.size();
+        return quadratic(q1.a() - q2.a(), q1.b() - q2.b(), q1.c() - q2.c(), new_size);
+    } else {
+        return BinaryExpr(std::minus<>{}, lhs.derived(), rhs.derived());
+    }
 }
 template <typename Lhs, typename Rhs>
 auto operator*(const numiterator<Lhs>& lhs, const numiterator<Rhs>& rhs) {
-    return BinaryExpr(std::multiplies<>{}, lhs.derived(), rhs.derived());
+    if constexpr (is_ap_v<Lhs> && is_ap_v<Rhs>) {
+        auto& q1 = lhs.derived();
+        auto& q2 = rhs.derived();
+        if (q1.size() != 0 && q2.size() != 0 && q1.size() != q2.size()) {
+             throw std::runtime_error("Incompatible sizes in BinaryExpr (AP * AP)");
+        }
+        size_t new_size = q1.size() != 0 ? q1.size() : q2.size();
+        return quadratic(q1.b() * q2.b(),
+                        q1.b() * q2.c() + q2.b() * q1.c(),
+                        q1.c() * q2.c(),
+                        new_size);
+    } else {
+        return BinaryExpr(std::multiplies<>{}, lhs.derived(), rhs.derived());
+    }
 }
-template <typename ScalarType, typename Rhs>
+template <typename T>
+concept NotNumIterator = !std::is_base_of_v<numiterator<T>, T>;
+
+template <NotNumIterator ScalarType, typename Rhs>
 auto operator*(const ScalarType& lhs, const numiterator<Rhs>& rhs) {
-    return BinaryExpr(std::multiplies<>{}, Scalar<ScalarType>(lhs), rhs.derived());
+    if constexpr (is_quadratic_v<Rhs>) {
+        auto& q = rhs.derived();
+        return quadratic(static_cast<typename Rhs::value_type>(lhs * q.a()),
+                        static_cast<typename Rhs::value_type>(lhs * q.b()),
+                        static_cast<typename Rhs::value_type>(lhs * q.c()),
+                        q.size());
+    } else {
+        return BinaryExpr(std::multiplies<>{}, Scalar<ScalarType>(lhs), rhs.derived());
+    }
 }
-template <typename Lhs, typename ScalarType>
+template <typename Lhs, NotNumIterator ScalarType>
 auto operator*(const numiterator<Lhs>& lhs, const ScalarType& rhs) {
     return rhs * lhs.derived();
 }
@@ -239,12 +364,28 @@ private:
 // --- Reductions ---
 template <typename Iter>
 auto sum(const numiterator<Iter>& iter) {
-    using T = decltype(iter.derived()[0]);
-    T total = 0;
-    for (size_t i = 0; i < iter.size(); ++i) {
-        total += iter.derived()[i];
+    if constexpr (is_quadratic_v<Iter>) {
+        auto& q = iter.derived();
+        using T = typename Iter::value_type;
+        double n = static_cast<double>(q.size());
+        if (n == 0) return static_cast<T>(0);
+        double A = static_cast<double>(q.a());
+        double B = static_cast<double>(q.b());
+        double C = static_cast<double>(q.c());
+
+        // Sum = A * (n-1)n(2n-1)/6 + B * (n-1)n/2 + C * n
+        double result = A * (n - 1.0) * n * (2.0 * n - 1.0) / 6.0 +
+                        B * (n - 1.0) * n / 2.0 +
+                        C * n;
+        return static_cast<T>(result);
+    } else {
+        using T = decltype(iter.derived()[0]);
+        T total = 0;
+        for (size_t i = 0; i < iter.size(); ++i) {
+            total += iter.derived()[i];
+        }
+        return total;
     }
-    return total;
 }
 
 template <typename Iter>
