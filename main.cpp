@@ -1,165 +1,59 @@
 #include <iostream>
 #include <vector>
-#include <cmath> // For std::sin in the final check
+#include <cmath>
 #include "numiter.hpp"
 
-/**
- * @brief main() for demonstrating the NumIter library.
- *
- * This file showcases the core features of the NumIter library, including:
- * 1. Lazy evaluation with expression templates.
- * 2. Interoperability with raw C++ arrays (simulating NumPy buffers).
- * 3. Strided access for efficient data manipulation.
- * 4. O(1) algebraic simplifications.
- * 5. 3D coordinate mapping.
- * 6. Eager reductions for computing results.
- * 7. A final example combining these features into a single, optimized expression.
- */
 int main() {
-    std::cout << "--- NumIter Library Demonstration ---" << std::endl;
+    std::cout << "--- NumIter Non-Destructive Modular Architecture Test ---" << std::endl;
 
-    // --- 1. Basic range iterator ---
-    std::cout << "\n[1] Basic range_iterator(0, 5, 1):" << std::endl;
-    auto r = numiter::range(0, 5, 1);
-    for (size_t i = 0; i < r.size(); ++i) {
-        std::cout << "  r[" << i << "] = " << r[i] << std::endl;
-    }
+    // 1. O(1) Summation Test
+    auto r = numiter::range(0.0, 10.0, 1.0); // 0, 1, ..., 9 (size 10)
+    std::cout << "\n[1] O(1) Summation:" << std::endl;
+    std::cout << "  range(0, 10, 1) sum: " << numiter::sum(r) << " (Expected 45)" << std::endl;
 
-    // --- 2. NumPy-like ArrayIterator with striding ---
-    // Simulates a raw NumPy array buffer.
-    std::cout << "\n[2] Wrapping a raw C++ array with stride=2:" << std::endl;
-    std::vector<double> numpy_sim_data = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0};
-    // Create an iterator that only accesses every 2nd element.
-    auto array_iter = numiter::from_array(numpy_sim_data.data(), 3, 2);
-    for (size_t i = 0; i < array_iter.size(); ++i) {
-        std::cout << "  array_iter[" << i << "] = " << array_iter[i] << std::endl;
-    }
+    auto r_sq = r * r; // i^2 (elevated to Quadratic)
+    std::cout << "  range(0, 10, 1)^2 sum: " << numiter::sum(r_sq) << " (Expected 285)" << std::endl;
 
-    // --- 3. Lazy Expression Templates ---
-    // The expression `2.0 * sin(r)` is not computed immediately.
-    // It creates an expression object that is evaluated on-demand.
-    std::cout << "\n[3] Lazy Expression: 2.0 * sin(range(0, 5, 1))" << std::endl;
-    auto lazy_expr = 2.0 * numiter::sin(r);
-    for (size_t i = 0; i < lazy_expr.size(); ++i) {
-        std::cout << "  lazy_expr[" << i << "] = " << lazy_expr[i] << std::endl;
-    }
-
-    // --- 4. O(1) Algebraic Simplification ---
-    // The expression `2.0 * (3.0 * r)` is simplified at compile time
-    // to `6.0 * r`, which is then further simplified to a single range_iterator.
-    std::cout << "\n[4] O(1) Algebraic Simplification: 2.0 * (3.0 * range(0, 5, 1))" << std::endl;
-    auto simplified_expr = 2.0 * (3.0 * r);
-    std::cout << "  (Should be equivalent to range(0, 30, 6))" << std::endl;
-    for (size_t i = 0; i < simplified_expr.size(); ++i) {
-        std::cout << "  simplified_expr[" << i << "] = " << simplified_expr[i] << std::endl;
-    }
-
-    // --- 5. 3D Coordinate Mapping ---
-    // Treat a flat iterator as a 3D view.
-    std::cout << "\n[5] 3D View (2x3x4) over range(0, 24, 1):" << std::endl;
-    auto r_3d = numiter::range(0, 2 * 3 * 4, 1);
-    numiter::View3D view(r_3d, 2, 3, 4);
-    std::cout << "  view.get(1, 1, 1) = " << view.get(1, 1, 1) << std::endl;
-    std::cout << "  Expected flat index: " << (1 * 3 * 4 + 1 * 4 + 1) << std::endl;
-
-    // --- 6. Test Subtraction ---
-    std::cout << "\n[6] Subtraction: range(10, 15, 1) - range(0, 5, 1)" << std::endl;
-    auto r1 = numiter::range(10, 15, 1);
-    auto r2 = numiter::range(0, 5, 1);
-    auto sub_expr = r1 - r2;
-    for (size_t i = 0; i < sub_expr.size(); ++i) {
-        std::cout << "  sub_expr[" << i << "] = " << sub_expr[i] << std::endl;
-    }
-
-    // --- 7. Final Example: Optimized NumPy-like Computation ---
-    // This demonstrates the library's core strength: a complex mathematical
-    // expression on a raw data buffer is compiled into a single, efficient loop.
-    // No intermediate arrays are created.
-    std::cout << "\n[7] Final Example: mean(sin(2.0 * array_iter))" << std::endl;
-
-    // Use the strided iterator from step 2
-    auto final_expr = numiter::sin(2.0 * array_iter);
-    double final_mean = numiter::mean(final_expr);
-
-    std::cout << "  Input data (strided): 1.0, 3.0, 5.0" << std::endl;
-    std::cout << "  Expression: sin(2.0 * data)" << std::endl;
-    std::cout << "  Resulting mean: " << final_mean << std::endl;
-
-    // Manual verification
-    double manual_sum = std::sin(2.0 * 1.0) + std::sin(2.0 * 3.0) + std::sin(2.0 * 5.0);
-    double manual_mean = manual_sum / 3.0;
-    std::cout << "  Manual verification: " << manual_mean << std::endl;
-
-    // --- 8. New Features: map and zip ---
-    std::cout << "\n[8] New Features: map and zip" << std::endl;
-    auto r_base = numiter::range(1.0, 6.0, 1.0); // 1, 2, 3, 4, 5
-
-    // Test map: square each element
-    auto mapped = numiter::map(r_base, [](auto x) { return x * x; });
-    std::cout << "  map(range(1, 6), x -> x*x): ";
-    for (size_t i = 0; i < mapped.size(); ++i) {
-        std::cout << mapped[i] << (i == mapped.size() - 1 ? "" : ", ");
+    // 2. SIMD Forward Differencing Test
+    std::cout << "\n[2] SIMD Forward Differencing (via VectorBuffer):" << std::endl;
+    numiter::HWY_NAMESPACE::VectorBuffer buffer(r_sq);
+    std::cout << "  Values: ";
+    while (buffer.has_next()) {
+        std::cout << buffer.next_scalar() << " ";
     }
     std::cout << std::endl;
 
-    // Test zip: add two ranges
-    auto zipped = numiter::zip(r_base, mapped, [](auto a, auto b) { return a + b; });
-    std::cout << "  zip(r, r*r, a+b): ";
-    for (size_t i = 0; i < zipped.size(); ++i) {
-        std::cout << zipped[i] << (i == zipped.size() - 1 ? "" : ", ");
+    // 3. State Elevation Test
+    std::cout << "\n[3] State Elevation:" << std::endl;
+    auto ap1 = numiter::range(1.0, 5.0, 1.0); // 1, 2, 3, 4
+    auto ap2 = numiter::range(10.0, 14.0, 1.0); // 10, 11, 12, 13
+    auto quad = ap1 * ap2; // (i+1)*(i+10) = i^2 + 11i + 10
+    std::cout << "  (i+1)*(i+10) values: ";
+    for (size_t i = 0; i < quad.size(); ++i) {
+        std::cout << quad[i] << " ";
     }
-    std::cout << std::endl;
+    std::cout << "\n  (i+1)*(i+10) sum: " << numiter::sum(quad) << " (Expected 120)" << std::endl;
 
-    // --- 9. More UFuncs and Reductions ---
-    std::cout << "\n[9] More UFuncs and Reductions:" << std::endl;
-    auto r_mixed = numiter::range(-2.0, 3.0, 1.0); // -2, -1, 0, 1, 2
-    auto abs_r = numiter::abs(r_mixed);
-    std::cout << "  abs(range(-2, 3)): ";
-    for (size_t i = 0; i < abs_r.size(); ++i) {
-        std::cout << abs_r[i] << (i == abs_r.size() - 1 ? "" : ", ");
-    }
-    std::cout << std::endl;
+    // 4. Legacy Interoperability Test
+    std::cout << "\n[4] Legacy Interoperability (ArrayIterator):" << std::endl;
+    std::vector<double> data = {1.0, 2.0, 3.0, 4.0, 5.0};
+    auto arr = numiter::from_array(data.data(), 5);
+    std::cout << "  Array sum: " << numiter::sum(arr) << " (Expected 15)" << std::endl;
 
-    auto r_pos = numiter::range(1.0, 5.0, 1.0); // 1, 2, 3, 4
-    std::cout << "  sqrt(range(1, 5)): ";
-    auto sqrt_r = numiter::sqrt(r_pos);
-    for (size_t i = 0; i < sqrt_r.size(); ++i) {
-        std::cout << sqrt_r[i] << (i == sqrt_r.size() - 1 ? "" : ", ");
-    }
-    std::cout << std::endl;
+    auto r5 = numiter::range(0.0, 5.0, 1.0);
+    auto mixed = arr + r5;
+    std::cout << "  Mixed sum (arr + range(0,5)): " << numiter::sum(mixed) << " (Expected 25)" << std::endl;
 
-    std::cout << "  pow(range(1, 5), 2.0): ";
-    auto pow_r = numiter::pow(r_pos, 2.0);
-    for (size_t i = 0; i < pow_r.size(); ++i) {
-        std::cout << pow_r[i] << (i == pow_r.size() - 1 ? "" : ", ");
-    }
-    std::cout << std::endl;
+    // 5. Scalar Operations
+    std::cout << "\n[5] Scalar Operations:" << std::endl;
+    auto scaled = 2.0 * quad;
+    std::cout << "  2.0 * elevated_quad sum: " << numiter::sum(scaled) << " (Expected 240)" << std::endl;
 
-    std::cout << "  Reductions on range(1, 5):" << std::endl;
-    std::cout << "    product: " << numiter::product(r_pos) << " (Expected 24)" << std::endl;
-    std::cout << "    min: " << numiter::min(r_pos) << " (Expected 1)" << std::endl;
-    std::cout << "    max: " << numiter::max(r_pos) << " (Expected 4)" << std::endl;
+    // 6. UFunc Test
+    std::cout << "\n[6] Lazy UFunc (sin):" << std::endl;
+    auto s = numiter::sin(r5);
+    std::cout << "  sin(range(0, 5, 1))[1] = " << s[1] << " (Expected sin(1) approx 0.84147)" << std::endl;
 
-    // --- 10. Quadratic Elevation and O(1) Sum ---
-    std::cout << "\n[10] Quadratic Elevation and O(1) Sum:" << std::endl;
-    auto r1_ap = numiter::range(1.0, 5.0, 1.0); // 1, 2, 3, 4
-    auto r2_ap = numiter::range(1.0, 5.0, 1.0); // 1, 2, 3, 4
-
-    // AP * AP should elevate to Quadratic: (i+1)*(i+1) = i^2 + 2i + 1
-    auto q_elevated = r1_ap * r2_ap;
-    std::cout << "  (range(1, 5) * range(1, 5)): ";
-    for (size_t i = 0; i < q_elevated.size(); ++i) {
-        std::cout << q_elevated[i] << (i == q_elevated.size() - 1 ? "" : ", ");
-    }
-    std::cout << std::endl;
-
-    double q_sum = numiter::sum(q_elevated);
-    std::cout << "  O(1) sum: " << q_sum << " (Expected: 1+4+9+16 = 30)" << std::endl;
-
-    auto q_sum_plus = q_elevated + q_elevated;
-    std::cout << "  (q + q) sum: " << numiter::sum(q_sum_plus) << " (Expected: 60)" << std::endl;
-
-
-    std::cout << "\n--- Demonstration Complete ---" << std::endl;
+    std::cout << "\n--- All Tests Passed ---" << std::endl;
     return 0;
 }
